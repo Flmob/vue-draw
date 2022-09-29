@@ -46,8 +46,6 @@ const cursorsUrls = {
 const actionTypes = {
   FILL_SCREEN: "fillScreen",
   DRAW_LINE: "drawLine",
-  DRAW_LINE_WITH_EDGES: "drawLineWithEdges",
-  DRAW_FILLED_CIRCLE: "drawFilledCircle",
 };
 
 const history = [];
@@ -60,7 +58,6 @@ export default {
       y: 0,
       isDrawing: false,
       lineWidth: 10,
-      radius: 5,
       currentColor: colors.BLACK,
       lastColor: colors.WHITE,
     };
@@ -86,17 +83,11 @@ export default {
         [actionTypes.FILL_SCREEN](actionData) {
           self.fillWholeScreen(actionData.color, false);
         },
-        [actionTypes.DRAW_LINE_WITH_EDGES](actionData) {
+        [actionTypes.DRAW_LINE](actionData) {
           const { width, color, from, to } = actionData;
           self.pencil.lineWidth = width;
           self.setColor(color);
-          self.drawLineWithRoundEdges(from.x, from.y, to.x, to.y, false);
-        },
-        [actionTypes.DRAW_FILLED_CIRCLE](actionData) {
-          const { width, color, from } = actionData;
-          self.pencil.lineWidth = width;
-          self.setColor(color);
-          self.drawCircle(from.x, from.y);
+          self.drawLine(from.x, from.y, to.x, to.y, false);
         },
       };
     },
@@ -133,7 +124,7 @@ export default {
         this.setColor(color);
       }
     },
-    drawLine(x1, y1, x2, y2, withHistory = false) {
+    drawLine(x1, y1, x2, y2, withHistory = true) {
       this.canvas.beginPath();
       this.canvas.moveTo(x1, y1);
       this.canvas.lineTo(x2, y2);
@@ -150,53 +141,6 @@ export default {
         });
       }
     },
-    drawLineWithRoundEdges(x1, y1, x2, y2, withHistory = true) {
-      if (x1 === x2 && y1 === y2) {
-        this.drawCircle(x1, y1, true);
-        return;
-      }
-
-      this.drawCircle(x1, y1);
-      this.drawLine(x1, y1, x2, y2);
-      this.drawCircle(x2, y2);
-
-      if (withHistory) {
-        this.history.push({
-          type: this.actionTypes.DRAW_LINE_WITH_EDGES,
-          color: this.pencil.currentColor,
-          from: { x: x1, y: y1 },
-          to: { x: x2, y: y2 },
-          width: this.pencil.lineWidth,
-        });
-      }
-    },
-    drawCircle(x, y, withHistory = false) {
-      this.canvas.beginPath();
-      this.canvas.arc(x, y, this.pencil.radius, 0, 2 * Math.PI);
-      this.canvas.fill();
-      this.canvas.closePath();
-
-      if (withHistory) {
-        this.history.push({
-          type: this.actionTypes.DRAW_FILLED_CIRCLE,
-          color: this.pencil.currentColor,
-          from: { x, y },
-          width: this.pencil.lineWidth,
-        });
-      }
-    },
-    clearCircle(x, y) {
-      this.canvas.beginPath();
-      this.canvas.arc(x, y, this.pencil.radius, 0, 2 * Math.PI, false);
-      this.canvas.clip();
-      this.canvas.clearRect(
-        x - this.pencil.radius - 1,
-        y - this.pencil.radius - 1,
-        this.pencil.radius * 2 + 2,
-        this.pencil.radius * 2 + 2
-      );
-      this.canvas.clip();
-    },
     touchDraw(e) {
       const touch = e.touches[0] || e.changedTouches[0];
       const realTarget = this.canvas.canvas;
@@ -207,12 +151,7 @@ export default {
     },
     draw(e) {
       if (this.pencil.isDrawing) {
-        this.drawLineWithRoundEdges(
-          this.pencil.x,
-          this.pencil.y,
-          e.offsetX,
-          e.offsetY
-        );
+        this.drawLine(this.pencil.x, this.pencil.y, e.offsetX, e.offsetY);
 
         this.pencil.x = e.offsetX || 0;
         this.pencil.y = e.offsetY || 0;
@@ -225,12 +164,7 @@ export default {
     },
     stopDrawing(e) {
       if (this.pencil.isDrawing) {
-        this.drawLineWithRoundEdges(
-          this.pencil.x,
-          this.pencil.y,
-          e.offsetX,
-          e.offsetY
-        );
+        this.drawLine(this.pencil.x, this.pencil.y, e.offsetX, e.offsetY);
         this.pencil.x = 0;
         this.pencil.y = 0;
         this.pencil.isDrawing = false;
@@ -273,6 +207,9 @@ export default {
     const c = document.getElementById("myCanvas");
     this.canvas = c.getContext("2d");
 
+    this.canvas.lineCap = "round";
+    this.canvas.lineJoin = "round";
+
     this.canvas.fillStyle = this.colors.WHITE;
     this.fillWholeScreen(this.colors.WHITE);
 
@@ -284,7 +221,6 @@ export default {
       deep: true,
       handler: function () {
         this.canvas.lineWidth = this.pencil.lineWidth;
-        this.pencil.radius = Math.floor(this.pencil.lineWidth / 2);
       },
     },
   },
